@@ -1,0 +1,9 @@
+.DS_Store
+data/task_1.csv
+data/items_phase_1.csv
+data/items_train.csv
+data/task_1.csv
+data/images/
+__pycache__/
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
