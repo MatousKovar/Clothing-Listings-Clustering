@@ -1,20 +1,35 @@
+"""Dataset obsahuje klicove veci:
+1/ tvorba multi one hot encodingu
+2/ embedding pro geo kategorie
+3/ nacitani obrazku pro konkretni datovy bod
+4/ embedding pro textove popisky"""
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
 import math
+from PIL import Image
+from torchvision import transforms
+from transformers import AutoTokenizer
+import os
 
 class GlamiItemDataset(Dataset):
-    def __init__(self, df, vocab_manager, images_dir,price_scaled = True):
-        """
-        df: Pandas DataFrame s vyčištěnými daty (výstup ze scikit-learn pipeline)
-        vocab_manager: Náš načtený GlamiVocabularyManager
-        images_dir: Cesta ke složce s obrázky
-        """
+    def __init__(self, df, vocab_manager, images_dir, price_scaled = True, tokenizer_name="paraphrase-multilingual-MiniLM-L12-v2", max_len=128):
+        
         self.df = df.reset_index(drop=True)
         self.vocab = vocab_manager
         self.images_dir = images_dir
         self.price_scaled = price_scaled
         
+        # 1. Nastavení Tokenizeru
+        self.tokenizer = AutoTokenizer.from_pretrained(tokenizer_name)
+        self.max_len = max_len
+        
+        # 2. Transformace obrázků (Resize na 224x224 a Normalizace)
+        self.img_transform = transforms.Compose([
+            transforms.Resize((224, 224)),
+            transforms.ToTensor(),
+            transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
+        ])
     def __len__(self):
         return len(self.df)
 
@@ -42,26 +57,44 @@ class GlamiItemDataset(Dataset):
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
         
-        # Cena (už je škálovaná z pipeline)
-        if self.price_scaled:
-            price_tensor = torch.tensor([row['price_scaled']], dtype=torch.float32)
-        else:
-            price_tensor = torch.tensor([row['price_eur']], dtype=torch.float32)
-        
-        # Geo (použijeme .get s defaultní hodnotou 0, kdyby přišlo neznámé geo)
+        # jednoduche transformace
+        price_tensor = torch.tensor([row['price_scaled']], dtype=torch.float32)
         geo_idx = self.vocab.geo_dict.get(row['geo'], 0)
         geo_tensor = torch.tensor(geo_idx, dtype=torch.long)
-        
-        # --- MULTI-HOT VEKTORY ---
-        
-        # Zde reálně probíhá ta práce s tvými dicty!
         colors_tensor = self._to_multi_hot(row['colorTagIdsString'], self.vocab.color_dict)
         depts_tensor = self._to_multi_hot(row['departmentIds'], self.vocab.dept_dict)
         
+        # tokenizace
+        # Spojíme title a description pro lepší kontext
+        text = f"{row['title']} {row['description']}"
+        encoded = self.tokenizer(
+            text,
+            add_special_tokens=True, # text sam o sobe neobsahuje specialni tokeny pro transformer
+            max_length=self.max_len, # zbytek se usekne nejde vubec do tokenizeru
+            padding='max_length', # doplneni pokud je kratsi text nez max_length
+            truncation=True,  
+            return_attention_mask=True, # vektor obsahujici info o tom co je skutecne a co padding
+            return_tensors='pt' # vraci jako pytorch tensor
+        )
+
+        # obrazek
+        item_id = str(row['itemId'])
+        img_path = os.path.join(self.images_dir, f"{item_id}.jpg")
+        
+        try:
+            image = Image.open(img_path).convert('RGB')
+            image_tensor = self.img_transform(image)
+        except Exception as e:
+            image_tensor = torch.zeros((3, 224, 224), dtype=torch.float32)
+
         return {
-            "item_id": row['itemId'], # Vždy dobré vracet pro kontrolu
+            "item_id": item_id,
             "price": price_tensor,
             "geo": geo_tensor,
             "colors": colors_tensor,
-            "departments": depts_tensor
+            "departments": depts_tensor,
+            # Squeeze odstraní zbytečnou dimenzi [1, max_len] -> [max_len]
+            "input_ids": encoded['input_ids'].squeeze(0), # input_ids obsahuje encoding
+            "attention_mask": encoded['attention_mask'].squeeze(0),
+            "image": image_tensor
         }
