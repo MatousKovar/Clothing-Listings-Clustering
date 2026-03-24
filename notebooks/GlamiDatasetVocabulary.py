@@ -1,3 +1,4 @@
+"""Soubor udrzuje natrenovane mappingy jednotlivych kategorii na indexy, pracuje s tim Dataset"""
 import json
 import os
 
@@ -11,10 +12,8 @@ class GlamiVocabularyManager:
 
     def fit(self, df_transformed):
         """Builds the dictionaries from your training data."""
-        # (Insert the mapping logic we discussed earlier here)
-        # self.geo_dict = ...
-        unique_geos = df_transformed['geo'].dropna().unique().tolist()
-        self.geo_dict = {geo: idx for idx, geo in enumerate(unique_geos)}
+        unique_geos = sorted(df_transformed['geo'].dropna().unique().tolist())
+        self.geo_dict = {geo: idx for idx, geo in enumerate(unique_geos,start=1)} # 0 is reserved for unknown
 
         def build_id_mapping(series):
             all_ids = series.dropna().astype(str).str.split(',').explode().str.strip()

@@ -1,77 +1,67 @@
 import torch
 from torch.utils.data import Dataset
-from PIL import Image
-import os
-import numpy as np
+import pandas as pd
+import math
 
 class GlamiItemDataset(Dataset):
-    def __init__(self, df, image_dir, geo_to_idx, max_color_id, max_dept_id, transform=None):
+    def __init__(self, df, vocab_manager, images_dir,price_scaled = True):
+        """
+        df: Pandas DataFrame s vyčištěnými daty (výstup ze scikit-learn pipeline)
+        vocab_manager: Náš načtený GlamiVocabularyManager
+        images_dir: Cesta ke složce s obrázky
+        """
         self.df = df.reset_index(drop=True)
-        self.image_dir = image_dir
-        self.geo_to_idx = geo_to_idx
-        self.max_color_id = max_color_id
-        self.max_dept_id = max_dept_id
-        self.transform = transform
+        self.vocab = vocab_manager
+        self.images_dir = images_dir
+        self.price_scaled = price_scaled
         
     def __len__(self):
         return len(self.df)
+
+    def _to_multi_hot(self, ids_string, vocab_dict):
+        """
+        Bezpečně převede string (např. "14, 25") na multi-hot tenzor.
+        vocab_dict obsahuje mappingy z labelu na id pochazi z GlamiVocabularyManageru
+        """
+        vocab_size = len(vocab_dict)
+        tensor = torch.zeros(vocab_size, dtype=torch.float32)
         
-    def _to_multi_hot(self, ids_string, max_id):
-        """vytvori vektor idcek tak """
-        tensor = torch.zeros(max_id + 1, dtype=torch.float32)
-        if not ids_string or ids_string == "0":
+        if pd.isna(ids_string) or str(ids_string).strip() == "":
             return tensor
             
-        # Parse the comma-separated string into integers
-        try:
-            ids = [int(i.strip()) for i in str(ids_string).split(',') if i.strip()]
-            for i in ids:
-                if i <= max_id:
-                    tensor[i] = 1.0
-        except ValueError:
-            pass # Failsafe for weird corrupted strings
-            
+        raw_ids = [i.strip() for i in str(ids_string).split(',') if i.strip()]
+        
+        # Přiřazení jedniček v tenzoru, pokud id neni v vocab_dict, ignorujeme ji
+        for raw_id in raw_ids:
+            if raw_id in vocab_dict:
+                idx = vocab_dict[raw_id]
+                tensor[idx] = 1.0
+                
         return tensor
 
     def __getitem__(self, idx):
         row = self.df.iloc[idx]
         
-        # 1. Numerical Features (Scaled Price)
-        price_scaled = torch.tensor([row['price_scaled']], dtype=torch.float32)
-        price_euro = torch.tensor([row['price_eur']], dtype=torch.float32)
+        # Cena (už je škálovaná z pipeline)
+        if self.price_scaled:
+            price_tensor = torch.tensor([row['price_scaled']], dtype=torch.float32)
+        else:
+            price_tensor = torch.tensor([row['price_eur']], dtype=torch.float32)
         
-        # 2. Single Categorical (Geo)
-        # Default to 0 if geo is unknown
-        geo_idx = self.geo_to_idx.get(row['geo'], 0) 
+        # Geo (použijeme .get s defaultní hodnotou 0, kdyby přišlo neznámé geo)
+        geo_idx = self.vocab.geo_dict.get(row['geo'], 0)
         geo_tensor = torch.tensor(geo_idx, dtype=torch.long)
         
-        # MULTI CATHEGORICAL
-        color_tensor = self._to_multi_hot(row['colorTagIdsString'], self.max_color_id)
-        dept_tensor = self._to_multi_hot(row['departmentIds'], self.max_dept_id)
+        # --- MULTI-HOT VEKTORY ---
         
-        # LOAD IMAGE
-        image_path = os.path.join(self.image_dir, f"{row['itemId']}.jpg")
-        try:
-            image = Image.open(image_path).convert('RGB') 
-        except Exception as e:
-            # Failsafe: if image is missing, return a blank black image
-            image = Image.new('RGB', (224, 224), (0, 0, 0))
-            
-        # pro potreby croppingu, nebo rotace
-        if self.transform:
-            image = self.transform(image)
-            
-        # TODO tokenizace
-        title = str(row['title'])
-        description = str(row['description'])
-            
+        # Zde reálně probíhá ta práce s tvými dicty!
+        colors_tensor = self._to_multi_hot(row['colorTagIdsString'], self.vocab.color_dict)
+        depts_tensor = self._to_multi_hot(row['departmentIds'], self.vocab.dept_dict)
+        
         return {
-            "item_id": row['itemId'],
-            "price_scaled": price_scaled,
-            "geo_idx": geo_tensor,
-            "colors_multi_hot": color_tensor,
-            "depts_multi_hot": dept_tensor,
-            "image": image,
-            "title": title,
-            "description": description
+            "item_id": row['itemId'], # Vždy dobré vracet pro kontrolu
+            "price": price_tensor,
+            "geo": geo_tensor,
+            "colors": colors_tensor,
+            "departments": depts_tensor
         }
