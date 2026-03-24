@@ -7,8 +7,9 @@ class DepartmentIdsCleaner(BaseEstimator, TransformerMixin):
         super().__init__()
         
     def fit(self, X, y=None):
+        # for scikit famework to know it is fitted
+        self.is_fitted_ = True 
         return self
-
     def transform(self, X):
         if not isinstance(X, pd.DataFrame):
             X = pd.DataFrame(X, columns=['departmentIds'])
