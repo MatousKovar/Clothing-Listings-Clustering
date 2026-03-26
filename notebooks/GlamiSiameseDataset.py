@@ -20,13 +20,13 @@ class GlamiSiameseDataset(Dataset):
     def __getitem__(self, idx):
         row = self.pairs.iloc[idx]
         
-        idx1 = self.id_to_idx[str(row['item_id_1'])]
-        idx2 = self.id_to_idx[str(row['item_id_2'])]
+        idx1 = self.id_to_idx[str(int(row['item_id_1']))]
+        idx2 = self.id_to_idx[str(int(row['item_id_2']))]
         
         item1 = self.item_dataset[idx1]
         item2 = self.item_dataset[idx2]
         
-        label = torch.tensor(row['label'], dtype=torch.float32)
+        label = torch.tensor(row['is_duplicate'], dtype=torch.float32)
         
         return {
             "item1": item1,
