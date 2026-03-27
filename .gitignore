@@ -7,3 +7,4 @@ data/images/
 __pycache__/
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
+notebooks/clip_embeddings.pt

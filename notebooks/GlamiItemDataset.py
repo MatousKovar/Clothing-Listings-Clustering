@@ -66,7 +66,7 @@ class GlamiItemDataset(Dataset):
                     image_embedding = self.clip_model(**inputs).pooler_output.squeeze(0).cpu()
             except Exception as e:
                 # Fallback, pokud obrázek nejde načíst
-                image_embedding = torch.zeros(512, dtype=torch.float32)
+                image_embedding = torch.zeros(768, dtype=torch.float32)
 
         return {
             "item_id": item_id,
