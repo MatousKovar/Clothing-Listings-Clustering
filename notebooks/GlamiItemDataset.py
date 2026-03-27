@@ -51,7 +51,7 @@ class GlamiItemDataset(Dataset):
                                  truncation=True, return_tensors='pt')
         
         if self.embeddings_dict is not None:
-            image_embedding = self.embeddings_dict.get(item_id, torch.zeros(512, dtype=torch.float32))
+            image_embedding = self.embeddings_dict.get(item_id, torch.zeros(768, dtype=torch.float32))
             
             if image_embedding.device.type != 'cpu':
                 image_embedding = image_embedding.cpu()
@@ -62,7 +62,7 @@ class GlamiItemDataset(Dataset):
                 img = Image.open(img_path).convert("RGB")
                 inputs = self.clip_processor(images=img, return_tensors="pt").to(self.device)
                 with torch.no_grad():
-                    # Výstup je [1, 512], přes squeeze z něj uděláme [512] a hodíme na CPU
+                    # Výstup je [1, 768], přes squeeze z něj uděláme [768] a hodíme na CPU
                     image_embedding = self.clip_model(**inputs).pooler_output.squeeze(0).cpu()
             except Exception as e:
                 # Fallback, pokud obrázek nejde načíst
