@@ -8,3 +8,8 @@ __pycache__/
 .ipynb_checkpoints/
 notebooks/.ipynb_checkpoints/
 notebooks/clip_embeddings.pt
+data/clip_embeddings.pt
+notebooks/best_glami_model.pth
+notebooks/glami_baseline_model.pth
+notebooks/train_pairs_hard_negatives.csv
+notebooks/val_pairs_hard_negatives.csv
