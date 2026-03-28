@@ -13,3 +13,5 @@ notebooks/best_glami_model.pth
 notebooks/glami_baseline_model.pth
 notebooks/train_pairs_hard_negatives.csv
 notebooks/val_pairs_hard_negatives.csv
+.copilotignore
+notebooks/text_embeddings.pt

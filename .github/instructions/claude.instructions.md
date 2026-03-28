@@ -1,6 +1,10 @@
 ---
 applyTo: '**'
 ---
+
+NEDIVEJ SE DO SLOZKY data/images - je velka, zabije te to
+
+
 Provide project context and coding guidelines that AI should follow when generating code, answering questions, or reviewing changes.
 
 tohle je zadani: 
@@ -107,11 +111,12 @@ If multiple participants obtain the same F1 score:
 Higher Recall wins
 If still tied, Higher Precision wins
 
+NEDIVEJ SE DO SLOZKY data/images - je velka, zabije te to
 
 
+potrebuju toto naimplementovat. Uz mam naimplementovany GlamiDatasetVocabulary GlamiItemDataset a GlamiSiamese dataset. O neco jsem se pokousel v explore_datasets.ipynb jsem mel impplementaci ale nefungovalo to velmi dobre, takze mas pripravene datsety a chop se toho ty - idealne pouzij stejne obrazkove embeddingy - clip_embeddings.pt. Tlac na to at se to rychle trenuje, nemusi to byt 99.99 procent accuracy ale chci to pohotove testovat. V task_1.csv je 80% negativnich a 20% pozitivnich - s tim pocitej. 
 
-potrebuju toto naimplementovat. Uz mam naimplementovany GlamiDatasetVocabulary GlamiItemDataset a GlamiSiamese dataset. O neco jsem se pokousel v explore_datasets.ipynb ale uplne jsem selhal. Takze chci abys to postavil znovu v novem notebooku - idealne pouzij stejne obrazkove embeddingy. Tlac na to at se to rychle trenuje. Output je 80% negativnich a 20% pozitivnich. 
 
-Zaroven uz ted vim ze to co jsem zkousel neumelo proste poznat stejne obrazky - divny.
+Takze tvuj ukol je nasledujici - rozdelit data nejak rozumne udelat siamese dataset. Natrenovat model udelat demo outputu - vezmu id groupy vyprintim 5 obrazku 5 popisku a info jestli bych predikoval duplicitu nebo ne. 
 
-Takze tvuj ukol je nasledujici - pripra
+NEDIVEJ SE DO SLOZKY data/images - je velka, zabije te to
