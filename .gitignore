@@ -15,3 +15,5 @@ notebooks/train_pairs_hard_negatives.csv
 notebooks/val_pairs_hard_negatives.csv
 .copilotignore
 notebooks/text_embeddings.pt
+notebooks/train_pairs_improved.csv
+notebooks/val_pairs_improved.csv
