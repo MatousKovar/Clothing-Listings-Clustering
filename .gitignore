@@ -17,3 +17,4 @@ notebooks/val_pairs_hard_negatives.csv
 notebooks/text_embeddings.pt
 notebooks/train_pairs_improved.csv
 notebooks/val_pairs_improved.csv
+notebooks/fashion_clip_image_embeddings.pt

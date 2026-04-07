@@ -120,3 +120,56 @@ potrebuju toto naimplementovat. Uz mam naimplementovany GlamiDatasetVocabulary G
 Takze tvuj ukol je nasledujici - rozdelit data nejak rozumne udelat siamese dataset. Natrenovat model udelat demo outputu - vezmu id groupy vyprintim 5 obrazku 5 popisku a info jestli bych predikoval duplicitu nebo ne. 
 
 NEDIVEJ SE DO SLOZKY data/images - je velka, zabije te to
+
+
+
+
+
+
+
+-------------------PHASE 2------------------------
+
+
+Phase 2 – Product Grouping with Confidence
+
+Current Status
+
+The exact evaluation metric for Phase 2 will be finalized and published later.
+
+However, the following principles are already fixed.
+
+Task Description
+
+Using all items from items_phase_2.csv:
+
+construct product groups,
+assign a confidence score to each group.
+The confidence score should represent the belief that the items in the group correspond to the same underlying product.
+
+Important Considerations
+
+Real-World Product Frequency
+
+In the dataset:
+
+some products appear once,
+some appear 2–4 times,
+some appear more than 5 times.
+Therefore, the metric must properly handle:
+
+split clusters,
+over-merged clusters,
+imperfect group sizes.
+Confidence Calibration
+
+The Phase 2 metric will:
+
+reward correct high-confidence groups,
+penalize incorrect high-confidence groups,
+encourage calibrated confidence,
+penalize blind overconfidence.
+Before Phase 2 begins, we will publish:
+
+the exact mathematical definition,
+several toy examples,
+an explanation of metric behavior in edge cases.
