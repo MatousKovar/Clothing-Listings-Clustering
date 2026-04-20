@@ -1,11 +1,104 @@
-# Phase 2 — Product Grouping
+Competition 2026
 
-## Assignment
-- Input: `items_phase_2.csv` (~200k items, no labels)
-- Output: CSV — one line per group, comma-separated `item_id`s, max 100/line, singletons on own line
-- Metric: **Pairwise F1** (TP/FP/FN on item-pair edges)
-- No confidence score needed
+Cross-Geo Product Matching and Grouping Challenge
 
+This year’s competition focuses on identifying identical products across different listings and geographical markets.
+
+Participants must develop models capable of recognizing when multiple items correspond to the same underlying product, even if their:
+
+titles differ,
+descriptions vary,
+prices differ,
+images differ slightly,
+metadata differs across geographies.
+The dataset consists of real-world product data provided by Glami, a leading fashion search engine operating across multiple European markets.
+
+The challenge consists of two phases:
+
+Phase 1 – Duplicate detection within predefined groups
+Phase 2 – Product grouping with confidence estimation
+The goal is to combine multimodal signals such as text, image, price, and categorical metadata to perform robust duplicate detection under real-world noise.
+
+Dataset
+
+The competition uses real-world product listing data provided by Glami.
+
+Files Provided
+
+Participants will receive:
+
+items_train.csv (~900k items with labels)
+items_phase_1.csv (~200k items without labels)
+items_phase_2.csv (~200k items without labels, released in Phase 2)
+task_1.csv (15,000 predefined groups of 5 items)
+glami_images.tar.gz (images for all items – distributed separately)
+One image in the dataset is corrupted. You can download the correct version here: https://static.glami.hu/img/200x240bt/508912023.jpg
+
+Available Features Per Item
+
+Each item contains:
+
+title
+description
+geo
+price
+image
+department IDs
+color tag IDs
+label (hidden during competition except in the training set)
+Total Statistics
+
+~1.3M total items
+217k distinct product labels
+Competition Structure
+
+Phase 1 – Duplicate Detection Within Groups
+
+Task Description
+
+You are given 15,000 predefined groups, each containing 5 items.
+
+The groups are generated from items_phase_1.csv. Items may appear in multiple groups.
+
+A positive group contains at least two items that share the same product label.
+
+A negative group contains five different products.
+
+Positive groups may contain:
+
+2 identical items
+3 identical items
+4 identical items
+5 identical items
+Your Task
+
+For each group, predict whether it contains at least one duplicate pair.
+
+Let z_g = 1 denote that the group contains at least one pair of items with the same label, and z_g = 0 otherwise.
+
+Your task is to predict z_g for all groups.
+
+Phase 1 Evaluation
+
+We evaluate binary classification performance across all 15,000 groups.
+
+Precision = TP / (TP + FP)
+
+Recall = TP / (TP + FN)
+
+F1 = 2 * Precision * Recall / (Precision + Recall)
+
+Where:
+
+TP – correctly predicted positive groups
+FP – incorrectly predicted positive groups
+FN – missed positive groups
+Tie-breaking
+
+If multiple participants obtain the same F1 score:
+
+Higher Recall wins
+If still tied, Higher Precision wins
 Phase 2 – Product Grouping
 
 Task Description
@@ -75,9 +168,10 @@ Submission
 
 The submission process will be split into two parts. In the first part, you will submit your predictions from the items_phase_1.csv and you will get a full score on this part. In the second part, you will submit your predictions from the items_phase_2.csv where you will not be able to see the score that you achieved with your submission. This part will be used to sort the final leaderboard.
 
-## Assets
-- `clip_embeddings.pt` (768d), `text_embeddings.pt` (512d)
-- `siamese_best.pth` — trained duplicate classifier
-- ~900k train items with labels for validation
+
+
+# Phase 1 - ALREADY FINISHED
+
+## Phase 2
 
 Implement a clustering model in new notebook which will use my siamese model. This model will find neareset neighbors for each point and then use the siamese model to find duplicates inside those neighbors.
