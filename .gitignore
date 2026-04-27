@@ -1,20 +1,25 @@
 .DS_Store
-data/task_1.csv
-data/items_phase_1.csv
-data/items_train.csv
-data/task_1.csv
-data/images/
+.copilotignore
 __pycache__/
 .ipynb_checkpoints/
-notebooks/.ipynb_checkpoints/
-notebooks/clip_embeddings.pt
-data/clip_embeddings.pt
-notebooks/best_glami_model.pth
-notebooks/glami_baseline_model.pth
-notebooks/train_pairs_hard_negatives.csv
-notebooks/val_pairs_hard_negatives.csv
-.copilotignore
-notebooks/text_embeddings.pt
-notebooks/train_pairs_improved.csv
-notebooks/val_pairs_improved.csv
-notebooks/fashion_clip_image_embeddings.pt
+
+# raw competition data
+data/task_1.csv
+data/items_phase_1.csv
+data/items_phase_2.csv
+data/items_train.csv
+data/images/
+
+# all generated artifacts (multi-GB embeddings, model checkpoints, mined pairs)
+artifacts/embeddings/
+artifacts/pairs/
+
+# phase2 work-in-progress artifacts
+phase2/embeddings/
+phase2/models/
+
+# python packaging
+*.egg-info/
+.venv/
+build/
+dist/
