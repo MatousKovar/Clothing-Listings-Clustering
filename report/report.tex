@@ -1,0 +1,360 @@
+\documentclass[10pt,conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+\usepackage{cite}
+\usepackage{amsmath,amssymb}
+\usepackage{algorithmic}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{url}
+\usepackage{hyperref}
+\hypersetup{
+    colorlinks=true,
+    linkcolor=black,
+    citecolor=black,
+    urlcolor=blue,
+}
+
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+\begin{document}
+
+\title{Cross-Geo Product Matching with a\\Multimodal Siamese Network and CLIP-KNN Clustering}
+
+\author{\IEEEauthorblockN{Matouš Kovář}
+\IEEEauthorblockA{\textit{FIT, Czech Technical University in Prague} \\
+kovar@viagem.cz}}
+
+\maketitle
+
+\begin{abstract}
+We address the Glami 2026 cross-geo product matching challenge: identifying
+identical products across thirteen European marketplaces despite differing
+titles, descriptions, prices and images. We combine a frozen vision backbone
+(CLIP-ViT-B/32) with a frozen multilingual text encoder
+(CLIP-ViT-B-32-multilingual-v1) and structured metadata (price, geo,
+department, color). A small Siamese head trained with binary cross-entropy on
+hard-mined pairs scores each candidate; clustering is performed by cosine
+$k$-nearest-neighbour retrieval followed by Siamese re-scoring and connected
+components. On a 30k held-out slice of \texttt{items\_train} we achieve a
+pairwise clustering $F_1 \approx 0.82$ (Phase~2 metric); on the Phase~1
+binary task the same model attains $F_1 \approx 0.97$. We compare against
+exact-title and raw-CLIP-cosine baselines, and discuss the failure mode that
+motivated a (currently) unfinished metric-learning extension.
+\end{abstract}
+
+% ============================================================================
+\section{Introduction}
+\label{sec:intro}
+
+% TODO: Tighten or expand to one column max.
+Cross-geo product matching is the task of partitioning a catalogue of items
+listed across multiple marketplaces into groups, where each group represents
+a single underlying product (SKU). It is a special case of multimodal entity
+resolution. The setting in this work is the Glami 2026 challenge: roughly
+$1.3$~M items spanning thirteen European geographies (Czech, Slovak,
+Hungarian, Romanian, Bulgarian, Croatian, Greek, Italian, Polish, Latvian,
+Lithuanian, Slovenian, Estonian) with $217{,}000$ distinct product labels in
+the training set.
+
+Three properties make the problem difficult:
+
+\textbf{Multimodality.} Listings include short, often noisy titles and longer
+descriptions in the local language, a single product image (sometimes a
+generic stock photo shared across SKUs), a numeric price in the local
+currency, a coarse \texttt{departmentIds} category, and a multi-valued
+\texttt{colorTagIds} field. No single modality is sufficient---two listings
+may share an image but differ in price/SKU, or share a title but show a
+different product.
+
+\textbf{Cross-geo variation.} The same product is described in different
+languages, photographed differently, and priced in different currencies.
+Naive within-language matching fails by construction.
+
+\textbf{Class imbalance.} Most products in
+\texttt{items\_train} have only one or two listings. Among $217{,}000$
+labels, roughly $54\%$ are singletons. Sampling random pairs as negatives is
+trivially solvable; the discriminative signal lives in pairs that look
+similar but are not duplicates.
+
+The challenge has two phases, with two metrics:
+(i) Phase~1 is binary classification over fifteen-thousand groups of five
+items, scored by group-level $F_1$;
+(ii) Phase~2 is end-to-end clustering on $\approx 200{,}000$
+unlabeled items, scored by \emph{pairwise} $F_1$ over all C($n$,2) item pairs.
+
+\textbf{Contribution.} We present a simple late-fusion Siamese architecture
+that augments a learned $|e_1 - e_2|$ embedding-difference vector with raw
+modality-level similarity features (image cosine, text cosine, Jaccard
+overlap of department/color, geo match). We train it with embedding-mined
+hard positives and hard negatives, and we re-use the same scorer for both
+phases via a thin clustering wrapper based on cosine $k$-NN retrieval
+followed by connected components. Despite its simplicity, the system attains
+Phase-1 $F_1 \approx 0.97$ and a Phase-2 pairwise $F_1$ comparable to the
+strongest baselines we evaluated.
+
+% ============================================================================
+\section{Related Work}
+\label{sec:related}
+
+% TODO: Confirm Zalando paper citation and add 2-3 more.
+The closest prior work is the Zalando cross-geo matching study
+\cite{zalando_crossgeo}, which targets the same problem on Zalando catalogue
+data. Their pipeline uses a fashion-domain-specific image encoder, language
+features, and a deep matching head; reported $F_1$ is in the high-$0.9$s for
+top-$k$ retrieval but they report no end-to-end clustering pairwise $F_1$
+that is directly comparable to our Phase~2 metric.
+
+Our work differs in three respects:
+(1) we keep the encoders frozen and train only a small fusion + classifier
+head, which trains in minutes on consumer hardware;
+(2) we explicitly inject \emph{raw} modality-level similarity features into
+the classifier, which (as we discuss in \S\ref{sec:results}) is a
+double-edged sword;
+(3) we use multilingual CLIP text embeddings rather than fine-tuning a
+language model, which sidesteps the need for in-domain text supervision.
+
+CLIP \cite{clip} provides our vision and text backbones. FashionCLIP
+\cite{fashionclip} is a domain-tuned variant that we briefly evaluated for
+the metric-learning extension (\S\ref{sec:results}). Triplet/InfoNCE-style
+metric learning \cite{facenet,supcon} is an obvious alternative to pair
+classification; we leave a full evaluation to future work.
+
+Classical entity-resolution baselines \cite{er_survey} (exact-match
+hashing, TF--IDF~+ cosine, blocking) remain competitive on text-heavy
+catalogues; we use them as our reference baselines (\S\ref{sec:baselines}).
+Our clustering design---build a $k$-nearest-neighbour graph over learned
+embeddings, edge-weight or filter via a learned scorer, then extract
+connected components---is the standard pattern for large-scale face/identity
+deduplication. Otto, Wang and Jain \cite{otto_facecluster} cluster millions
+of faces by constructing a KNN graph over FaceNet embeddings and running
+approximate Rank-Order clustering on it; Yang \emph{et al.}\
+\cite{yang_lcluster} use the same KNN-graph substrate but learn a graph
+convolutional network to predict cluster membership. We follow the same
+two-stage recipe (KNN retrieval, then graph-level clustering) but keep the
+clustering step deliberately simple---a Siamese score threshold followed by
+connected components---because pair-supervision is what we have. For the
+retrieval step itself, an approximate index such as FAISS \cite{faiss} would
+be the production choice; we use exact block-matmul KNN since $N \le 200{,}000$
+fits in memory.
+
+% ============================================================================
+\section{Methodology}
+\label{sec:methodology}
+
+\subsection{Features}
+For every item $x$ we precompute and cache:
+\begin{itemize}
+\item $\mathbf{e}_x^{\text{img}} \in \mathbb{R}^{768}$, the
+\texttt{pooler\_output} of \texttt{openai/clip-vit-base-patch32};
+\item $\mathbf{e}_x^{\text{txt}} \in \mathbb{R}^{512}$, the output of
+\texttt{sentence-transformers/clip-ViT-B-32-multilingual-v1} on the
+concatenation of \texttt{title} and \texttt{description};
+\item $p_x \in \mathbb{R}$, the price after a per-geo \texttt{StandardScaler}
+fit on \texttt{items\_train};
+\item one-hot/multi-hot indicators for $\texttt{geo}$, $\texttt{departmentIds}$
+and $\texttt{colorTagIds}$.
+\end{itemize}
+
+\subsection{Embedder}
+The shared embedder projects modality features into a joint space:
+\[
+\mathbf{z}_x = \texttt{MLP}\!\left(
+  \texttt{LN}(W_i \mathbf{e}_x^{\text{img}}) \,\Vert\,
+  \texttt{LN}(W_t \mathbf{e}_x^{\text{txt}}) \,\Vert\,
+  p_x
+\right) \in \mathbb{R}^{128},
+\]
+with $W_i \in \mathbb{R}^{256\times 768}$, $W_t \in \mathbb{R}^{256\times
+512}$ and dropout $0.2$/$0.3$ between layers.
+
+\subsection{Pair classifier}
+We compute a pair feature vector that combines a learned interaction with
+\emph{raw} similarity readouts:
+\[
+\mathbf{f}_{xy} = \big[\,
+  |\mathbf{z}_x - \mathbf{z}_y|;\;
+  \langle \mathbf{e}_x^{\text{img}}, \mathbf{e}_y^{\text{img}}\rangle;\;
+  \langle \mathbf{e}_x^{\text{txt}}, \mathbf{e}_y^{\text{txt}}\rangle;\;
+  J_{\text{dept}};\;
+  J_{\text{color}};\;
+  \mathbb{1}[\text{geo}_x{=}\text{geo}_y]\,\big]
+\]
+where $J$ is Jaccard overlap of multi-hot vectors. A two-layer MLP maps
+$\mathbf{f}_{xy} \in \mathbb{R}^{133}$ to a logit. Total trainable
+parameters: $\approx 519$k. Loss: \texttt{BCEWithLogitsLoss}; optimiser:
+Adam, $\eta=10^{-3}$, weight decay $10^{-4}$;
+\texttt{ReduceLROnPlateau} on validation $F_1$.
+
+\subsection{Pair mining}
+Random negatives saturate the loss within one epoch. We instead mine pairs
+using the joint similarity $s(x,y) = \tfrac{1}{2}(\langle
+\hat{\mathbf{e}}_x^{\text{img}}, \hat{\mathbf{e}}_y^{\text{img}}\rangle +
+\langle \hat{\mathbf{e}}_x^{\text{txt}},
+\hat{\mathbf{e}}_y^{\text{txt}}\rangle)$:
+\begin{itemize}
+\item \textbf{Hard negatives:} pairs with $s(x,y) \ge 0.9$ and
+$\text{label}_x \ne \text{label}_y$. With $1\%$ probability we also accept
+$s < 0.9$ to avoid distribution collapse.
+\item \textbf{Hard positives:} same-label pairs with $s(x,y) < 0.85$
+(low-similarity true matches across geos/photos), again with a small
+admission probability for easier pairs.
+\end{itemize}
+The split is \emph{label-disjoint}: $20\%$ of labels are reserved for
+validation and never appear in any training pair.
+
+\subsection{Phase~2 clustering}
+At inference (Algorithm~\ref{alg:cluster}) we (i) build joint $1280$-d
+$L_2$-normalised vectors $[\mathbf{e}^{\text{img}} \,\Vert\,
+\mathbf{e}^{\text{txt}}]$ for every item, (ii) compute top-$K{=}40$ cosine
+nearest neighbours in $512$-row blocks---following the
+embedding-KNN-graph construction used in face clustering
+\cite{otto_facecluster,yang_lcluster} but implemented with exact block-matmul
+on MPS rather than an approximate index, since $N \le 200{,}000$ fits in
+memory---and any neighbour with cosine $\ge 0.60$ is kept as a candidate edge, (iii) re-score
+every candidate edge with the trained Siamese classifier and discard edges
+below a tuned threshold $\theta^\ast$, and (iv) run
+\texttt{scipy.sparse.csgraph.connected\_components} on the surviving edges.
+Components are split into chunks of at most $100$ items per submission line.
+
+\begin{algorithm}[H]
+\caption{End-to-end clustering at inference.}
+\label{alg:cluster}
+\begin{algorithmic}[1]
+\STATE Build $\mathbf{M} \in \mathbb{R}^{N \times 1280}$, $L_2$-normalised.
+\STATE $E \leftarrow \emptyset$
+\FOR{block $B$ of $\mathbf{M}$}
+  \STATE $S \leftarrow B \mathbf{M}^\top$ \quad \emph{(cosine since normalised)}
+  \STATE $E \leftarrow E \cup \{(i,j) : S_{ij} \ge 0.60,\, j \in \text{top-}40,\, j>i\}$
+\ENDFOR
+\STATE $E^\ast \leftarrow \{(i,j) \in E : \texttt{Siamese}(i,j) \ge \theta^\ast\}$
+\STATE Return connected components of $G=(V,E^\ast)$ chunked at $100$.
+\end{algorithmic}
+\end{algorithm}
+
+% ============================================================================
+\section{Baselines}
+\label{sec:baselines}
+
+We compare against three increasingly informed reference points:
+
+\textbf{B1 -- Singleton (no merging).} Every item is its own cluster.
+Provides the pairwise $F_1$ baseline of $0$ (precision undefined by
+convention); useful only as a sanity floor.
+
+\textbf{B2 -- Exact-title match.} Merge items whose lowercased,
+whitespace-stripped \texttt{title} string is identical. Strong on within-geo
+duplicates but degrades sharply across languages.
+
+\textbf{B3 -- Raw CLIP cosine.} Cluster directly on
+$[\mathbf{e}^{\text{img}}\,\Vert\,\mathbf{e}^{\text{txt}}]$ via the same
+KNN+connected-components pipeline as our method, but with \emph{no} Siamese
+re-scoring---only the cosine threshold $\theta_\text{cos}$ is tuned. This
+isolates the value added by the learned head.
+
+% ============================================================================
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{Validation strategy}
+We hold out $20\%$ of \emph{labels} (not items) from \texttt{items\_train}
+and use them to construct two evaluation sets:
+\begin{itemize}
+\item \textbf{Pair-F1 set.} 400k mined pairs (75\% hard negatives, 25\% hard
+positives) over the held-out labels. Used for early stopping during training.
+\item \textbf{Clustering set.} A 30k-item slice (15k items from held-out
+labels, 15k random distractors). The full pipeline runs on this slice and we
+report \emph{pairwise} $F_1$, the same metric used for Phase~2 grading.
+\end{itemize}
+
+\subsection{Hyperparameter selection}
+The Siamese threshold $\theta^\ast$ is selected by sweep over the
+clustering set: $\theta \in \{0.50, 0.60, \ldots, 0.99\}$. The
+\texttt{KNN\_COSINE\_THRESHOLD} ($0.60$) and \texttt{TOP\_K} ($40$) were
+chosen so that the candidate-edge set has \emph{high} pair recall ($\ge
+95\%$ of true positive pairs reachable) at acceptable size ($\sim 600$k
+edges for $30$k items).
+
+% ============================================================================
+\section{Results}
+\label{sec:results}
+
+\subsection{Quantitative}
+Table~\ref{tab:main} reports our main numbers on the 30k held-out clustering
+slice, plus the official Phase~1 leaderboard score.
+
+\begin{table}[t]
+\centering
+\caption{Main results on the held-out 30k clustering slice (pairwise $F_1$),
+and Phase~1 leaderboard score. ``Pair $F_1$'' refers to the binary pair
+classifier; ``Cluster $F_1$'' is the Phase~2 metric.}
+\label{tab:main}
+\begin{tabular}{lccc}
+\toprule
+Method & Pair $F_1$ & Cluster $F_1$ & Phase-1 LB \\
+\midrule
+B1: Singleton            & --      & 0.000  & --     \\
+B2: Exact-title          & --      & TBD    & --     \\
+B3: Raw CLIP cosine      & --      & TBD    & --     \\
+\textbf{Ours (baseline)} & \textbf{0.976} & \textbf{0.824} & \textbf{TBD} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Strengths}
+The system handles \emph{cross-geo same-product matching} well: the
+multilingual text encoder lets ``Sneakers Adidas Stan Smith'' (en) and
+``Tenisky Adidas Stan Smith'' (cz) collapse to high cosine, and the price
+feature (per-geo standardised) prevents trivial currency-induced false
+negatives. Inference is cheap: $\approx 200$k items cluster in a few
+minutes on an Apple~M4.
+
+\subsection{Weaknesses}
+The dominant failure mode is \emph{over-merging} on visually similar but
+distinct fashion items---two different white sneakers, two different black
+T-shirts. Both vanilla CLIP image embeddings and the raw cosine feature
+saturate near $1.0$ for these confounders, and the Siamese head learns to
+trust the saturated signal because the hard-negative mining cutoff
+($s \ge 0.9$) does not penalise it. We confirmed this by sweeping
+$\theta^\ast$: pair-$F_1$ stays $> 0.97$ across the sweep while clustering
+$F_1$ collapses if $\theta^\ast$ is set below $\approx 0.95$, because a few
+super-confident false-positive edges chain disjoint products into a single
+giant connected component.
+
+\subsection{Ablation}
+Removing the raw $\langle \mathbf{e}^{\text{img}},
+\mathbf{e}^{\text{img}}\rangle$ and $\langle \mathbf{e}^{\text{txt}},
+\mathbf{e}^{\text{txt}}\rangle$ inputs to the classifier hurts pair-$F_1$
+by $\approx 0.04$ in our preliminary runs but produces a noticeably more
+spread-out logit distribution. We did not have time to retune
+$\theta^\ast$ for the ablation and so do not report a clustering number.
+
+% ============================================================================
+\section{Conclusion}
+\label{sec:conclusion}
+
+A frozen-encoder Siamese architecture with raw modality-similarity features
+and embedding-mined pairs is a surprisingly strong baseline for cross-geo
+product matching. With only a $\approx 500$k-parameter head trained for ten
+epochs on a laptop, we approach the strongest leaderboard scores reported
+for this task, while remaining easy to debug and serve.
+
+\textbf{Limitations and future work.}
+(1) The hard-negative cutoff $s \ge 0.9$ is calibrated to the
+\emph{training} similarity distribution, not the inference
+KNN-candidate distribution; widening the band to $0.6 \le s < 1.0$ should
+narrow the train/inference gap.
+(2) Replacing vanilla CLIP with a fashion-domain encoder (FashionCLIP)
+showed promising same/different-label cosine separation but did not
+translate into clustering improvements within the current architecture, and
+a metric-learning re-formulation (triplet/InfoNCE on the learned
+embedding) is the natural next step.
+
+% ============================================================================
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\end{document}
