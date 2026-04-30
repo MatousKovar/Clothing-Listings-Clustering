@@ -272,11 +272,40 @@ report \emph{pairwise} $F_1$, the same metric used for Phase~2 grading.
 
 \subsection{Hyperparameter selection}
 The Siamese threshold $\theta^\ast$ is selected by sweep over the
-clustering set: $\theta \in \{0.50, 0.60, \ldots, 0.99\}$. The
-\texttt{KNN\_COSINE\_THRESHOLD} ($0.60$) and \texttt{TOP\_K} ($40$) were
-chosen so that the candidate-edge set has \emph{high} pair recall ($\ge
-95\%$ of true positive pairs reachable) at acceptable size ($\sim 600$k
-edges for $30$k items).
+clustering set. The \texttt{KNN\_COSINE\_THRESHOLD} ($0.60$) and
+\texttt{TOP\_K} ($40$) were chosen so that the candidate-edge set has
+\emph{high} pair recall (over $95\%$ of true positive pairs reachable) at
+acceptable size ($\sim 600$k edges for $30$k items).
+Table~\ref{tab:sweep} shows the full sweep over $\theta$. Pairwise
+$F_1$ peaks sharply at $\theta^\ast = 0.97$ ($F_1 = 0.824$); the size of the
+largest predicted cluster is the cleanest leading indicator of
+over-merging---it stays under $50$ items down to $\theta = 0.95$ but jumps
+past $200$ at $\theta = 0.90$ and past $500$ at $\theta = 0.85$, at which
+point a few false-positive edges chain entire connected components together
+and precision collapses while recall barely moves.
+
+\begin{table}[t]
+\centering
+\caption{Siamese threshold sweep on the held-out 30k clustering slice. ``Edges''
+is the number of pair candidates surviving threshold $\theta$; ``Max cl.''
+is the size of the largest predicted connected component.}
+\label{tab:sweep}
+\begin{tabular}{lrrrrr}
+\toprule
+$\theta$ & Edges & $P$ & $R$ & $F_1$ & Max cl. \\
+\midrule
+0.99 & 13{,}691 & 0.978 & 0.674 & 0.798 & 18  \\
+0.98 & 15{,}210 & 0.963 & 0.716 & 0.821 & 19  \\
+\textbf{0.97} & \textbf{15{,}980} & \textbf{0.935} & \textbf{0.737} & \textbf{0.824} & \textbf{22}  \\
+0.95 & 17{,}010 & 0.807 & 0.759 & 0.782 & 46  \\
+0.92 & 18{,}301 & 0.495 & 0.785 & 0.607 & 123 \\
+0.90 & 19{,}064 & 0.299 & 0.797 & 0.435 & 212 \\
+0.88 & 19{,}744 & 0.228 & 0.806 & 0.355 & 261 \\
+0.85 & 20{,}728 & 0.100 & 0.816 & 0.178 & 509 \\
+0.80 & 22{,}405 & 0.048 & 0.832 & 0.091 & 762 \\
+\bottomrule
+\end{tabular}
+\end{table}
 
 % ============================================================================
 \section{Results}
